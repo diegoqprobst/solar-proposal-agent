@@ -1,0 +1,11 @@
+{
+  "_note": "Synthetic payload in the NASA POWER climatology response shape. Values are made up for tests; never use them for a site.",
+  "properties": {
+    "parameter": {
+      "ALLSKY_SFC_SW_DWN": {
+        "JAN": 3.8, "FEB": 3.9, "MAR": 4.1, "APR": 3.9, "MAY": 3.5, "JUN": 3.1,
+        "JUL": 2.9, "AUG": 3.0, "SEP": 3.3, "OCT": 3.6, "NOV": 3.7, "DEC": 3.8, "ANN": 3.55
+      }
+    }
+  }
+}

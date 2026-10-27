@@ -1,0 +1,31 @@
+{
+  "name": "Example (synthetic): solar water pumping + lit evacuation route",
+  "_note": "Synthetic numbers to exercise the pipeline. Not a real site.",
+  "site": {"latitude": -0.25, "longitude": -79.17},
+  "pumping": {
+    "volume_m3_day": {"value": 60, "kind": "assumption", "ref": "150 families x ~0.4 m3/day; confirm with the plant's flow records"},
+    "head_m": {"value": 25, "kind": "assumption", "ref": "not measured; needs a site survey (static lift + pipe losses)"},
+    "wire_to_water_eff": {"value": 0.45, "kind": "assumption", "ref": "typical small DC submersible; replace with the pump curve"}
+  },
+  "lighting": {
+    "route_length_m": {"value": 420, "kind": "assumption", "ref": "to be measured on the map / on foot"},
+    "spacing_m": {"value": 30, "kind": "assumption", "ref": "typical for low-traffic pedestrian routes; confirm with the luminaire photometry"},
+    "power_w": {"value": 40, "kind": "assumption", "ref": "replace with the chosen luminaire datasheet"},
+    "hours": {"value": 12, "kind": "assumption", "ref": "dusk to dawn near the equator"}
+  },
+  "system": {
+    "performance_ratio": {"value": 0.75, "kind": "assumption", "ref": "typical off-grid PR incl. temperature, soiling and wiring losses"},
+    "module_wp": {"value": 550, "kind": "assumption", "ref": "replace with the chosen module datasheet"},
+    "autonomy_days": {"value": 1.5, "kind": "assumption", "ref": "design choice; agree with the client"},
+    "depth_of_discharge": {"value": 0.8, "kind": "assumption", "ref": "LiFePO4 typical; replace with battery datasheet"},
+    "battery_efficiency": {"value": 0.95, "kind": "assumption", "ref": "LiFePO4 typical; replace with battery datasheet"},
+    "system_voltage": {"value": 48, "kind": "assumption", "ref": "design choice"}
+  },
+  "solar": {
+    "design_psh": {"value": 3.2, "kind": "assumption", "ref": "placeholder until NASA POWER is fetched for the site"}
+  },
+  "diesel": {
+    "genset_kwh_per_litre": {"value": 2.5, "kind": "assumption", "ref": "small generator at partial load; confirm with fuel records"},
+    "days_per_year": {"value": 365, "kind": "assumption", "ref": "generator would otherwise cover every day"}
+  }
+}

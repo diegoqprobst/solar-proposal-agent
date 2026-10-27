@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+# Real site data (photos, client documents, personal data) never goes in this public repo.
+private/
