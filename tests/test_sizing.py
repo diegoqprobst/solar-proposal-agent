@@ -82,3 +82,17 @@ def test_cli(capsys, tmp_path):
     broken.write_text(json.dumps(c))
     assert main(["size", str(broken)]) == 2
     assert "PV performance ratio" in capsys.readouterr().err
+
+
+def test_load_env_reads_file_and_does_not_override(tmp_path, monkeypatch):
+    from solar_agent import llm
+    env = tmp_path / ".env"
+    env.write_text('# c\nMODEL_API_KEY="abc"\nMODEL_API_MODEL=\nOTHER=1\n')
+    monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("MODEL_API_MODEL", raising=False)
+    monkeypatch.setenv("OTHER", "keep")
+    llm.load_env(env)
+    import os
+    assert os.environ["MODEL_API_KEY"] == "abc"
+    assert "MODEL_API_MODEL" not in os.environ  # empty value ignored
+    assert os.environ["OTHER"] == "keep"

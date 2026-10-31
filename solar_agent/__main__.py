@@ -11,13 +11,32 @@ from solar_agent import case as case_mod
 from solar_agent import sizing, solar_resource
 
 
+def ping() -> int:
+    from solar_agent import llm
+
+    try:
+        resp = llm.client().chat.completions.create(
+            model=llm.model(), max_tokens=20,
+            messages=[{"role": "user", "content": "Reply with the single word: ok"}],
+        )
+    except Exception as e:  # report the cause without ever printing the key
+        print(f"FAILED: {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+    print(f"OK, model {llm.model()} answered: {resp.choices[0].message.content!r}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="solar_agent")
     sub = ap.add_subparsers(dest="command", required=True)
     sz = sub.add_parser("size", help="size a case and print the traced report")
     sz.add_argument("case")
     sz.add_argument("--nasa-power", help="saved NASA POWER payload; otherwise fetched if the case has coordinates")
+    sub.add_parser("ping", help="check the Meta Model API key with one tiny request")
     args = ap.parse_args(argv)
+
+    if args.command == "ping":
+        return ping()
 
     case = case_mod.load(args.case)
     psh = None
