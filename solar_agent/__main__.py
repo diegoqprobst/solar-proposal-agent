@@ -16,13 +16,25 @@ def ping() -> int:
 
     try:
         resp = llm.client().chat.completions.create(
-            model=llm.model(), max_tokens=20,
+            model=llm.model(), max_tokens=500,
             messages=[{"role": "user", "content": "Reply with the single word: ok"}],
         )
     except Exception as e:  # report the cause without ever printing the key
         print(f"FAILED: {type(e).__name__}: {e}", file=sys.stderr)
         return 1
-    print(f"OK, model {llm.model()} answered: {resp.choices[0].message.content!r}")
+    choice, usage = resp.choices[0], resp.usage
+    print(f"model={llm.model()} finish_reason={choice.finish_reason}")
+    if usage:
+        details = getattr(usage, "completion_tokens_details", None)
+        print(f"tokens: prompt={usage.prompt_tokens} completion={usage.completion_tokens} details={details}")
+    extra = [k for k in ("reasoning", "reasoning_content") if getattr(choice.message, k, None)]
+    if extra:
+        print(f"message also carries: {', '.join(extra)}")
+    text = (choice.message.content or "").strip()
+    if not text:
+        print("FAILED: the model returned no text. See finish_reason and tokens above.", file=sys.stderr)
+        return 1
+    print(f"OK, answered: {text!r}")
     return 0
 
 
