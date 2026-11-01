@@ -1,0 +1,10 @@
+DATASHEETS (synthetic example)
+
+PV module XM-550: rated power 550 Wp.
+
+LiFePO4 battery rack LR-51: nominal voltage 51.2 V, usable depth of discharge 80 %,
+round-trip efficiency 95 %.
+
+DC submersible pump SP-6: wire-to-water efficiency at the duty point 45 %.
+
+Solar street luminaire SL-40: power 40 W.

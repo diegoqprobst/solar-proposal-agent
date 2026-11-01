@@ -1,0 +1,6 @@
+SITE SURVEY (synthetic example) - 2026-10-20
+Daily water consumption from the plant log: 60 m3/day.
+Total dynamic head (static lift plus pipe losses), measured: 25 m.
+Evacuation route length measured on foot: 420 m.
+Pole spacing allowed by the municipal lighting rule: 30 m.
+Lighting hours required: dusk to dawn, 12 hours per night.

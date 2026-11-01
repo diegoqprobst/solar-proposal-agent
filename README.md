@@ -85,3 +85,12 @@ This tool produces a preliminary design for a qualified installer or engineer to
 ## License
 
 MIT
+
+## Agent
+
+```bash
+python -m solar_agent ping                                  # check the Meta API key
+python -m solar_agent agent cases/example-agent             # run the agent; writes runs/example-agent/
+```
+
+The agent only records inputs. A value cited from a document must quote it exactly, and the value must appear in the quote, or it is rejected. What a document cannot prove goes to a person. The proposal is written by code, never by the model. Muse Spark reasons before answering, so each call is given a generous token limit.

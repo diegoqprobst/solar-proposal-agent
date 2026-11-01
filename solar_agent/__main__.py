@@ -38,17 +38,39 @@ def ping() -> int:
     return 0
 
 
+def agent(case_dir: str, out: str, max_turns: int) -> int:
+    from solar_agent import llm
+    from solar_agent.agent import loop
+    from solar_agent.agent.workspace import load_workspace
+
+    ws, objective = load_workspace(case_dir)
+    result = loop.run(llm.client(), llm.model(), ws, objective, max_turns=max_turns, log=print)
+    dest = Path(out) / Path(case_dir).name
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "proposal.md").write_text(ws.proposal(), encoding="utf-8")
+    (dest / "trace.json").write_text(ws.trace_json(), encoding="utf-8")
+    print(f"\n{'finished' if result['finished'] else 'STOPPED before finishing'} in {result['turns']} turns; "
+          f"wrote {dest}/proposal.md and trace.json")
+    return 0 if result["finished"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="solar_agent")
     sub = ap.add_subparsers(dest="command", required=True)
     sz = sub.add_parser("size", help="size a case and print the traced report")
     sz.add_argument("case")
     sz.add_argument("--nasa-power", help="saved NASA POWER payload; otherwise fetched if the case has coordinates")
+    ag = sub.add_parser("agent", help="run the agent on a case folder and write the proposal")
+    ag.add_argument("case_dir")
+    ag.add_argument("--out", default="runs")
+    ag.add_argument("--max-turns", type=int, default=25)
     sub.add_parser("ping", help="check the Meta Model API key with one tiny request")
     args = ap.parse_args(argv)
 
     if args.command == "ping":
         return ping()
+    if args.command == "agent":
+        return agent(args.case_dir, args.out, args.max_turns)
 
     case = case_mod.load(args.case)
     psh = None
