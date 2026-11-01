@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Iterator, Literal
 
-SourceKind = Literal["measured", "datasheet", "standard", "dataset", "assumption"]
+SourceKind = Literal["measured", "datasheet", "standard", "dataset", "assumption", "image"]
 
 
 @dataclass(frozen=True)
@@ -62,11 +62,11 @@ def leaves(v: Value) -> Iterator[Value]:
 
 
 def open_questions(*values: Value) -> list[Value]:
-    """Assumptions behind the given values, deduplicated: what a person must confirm before signing."""
+    """Assumptions and photo readings behind the given values, deduplicated: what a person must confirm before signing."""
     seen: dict[tuple[str, float], Value] = {}
     for v in values:
         for leaf in leaves(v):
-            if leaf.source and leaf.source.kind == "assumption":
+            if leaf.source and leaf.source.kind in ("assumption", "image"):
                 seen.setdefault((leaf.label, leaf.value), leaf)
     return list(seen.values())
 

@@ -38,6 +38,26 @@ def ping() -> int:
     return 0
 
 
+def see(image: str, prompt: str) -> int:
+    from solar_agent import llm
+
+    size = Path(image).stat().st_size
+    if size > llm.MAX_IMAGE_BYTES:
+        print(f"FAILED: {image} is {size / 1e6:.1f} MB; resize it under {llm.MAX_IMAGE_BYTES // 1_000_000} MB "
+              "(macOS: sips -Z 1600 photo.jpg --out small.jpg)", file=sys.stderr)
+        return 1
+    try:
+        resp = llm.client().chat.completions.create(
+            model=llm.model(), max_tokens=4000,
+            messages=[{"role": "user", "content": [{"type": "text", "text": prompt}, llm.image_part(image)]}])
+    except Exception as e:
+        print(f"FAILED: {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+    print(f"finish_reason={resp.choices[0].finish_reason}\n")
+    print((resp.choices[0].message.content or "").strip() or "(no text returned)")
+    return 0
+
+
 def agent(case_dir: str, out: str, max_turns: int) -> int:
     from solar_agent import llm
     from solar_agent.agent import loop
@@ -68,11 +88,16 @@ def main(argv: list[str] | None = None) -> int:
     ag.add_argument("case_dir")
     ag.add_argument("--out", default="runs")
     ag.add_argument("--max-turns", type=int, default=25)
+    se = sub.add_parser("see", help="ask the model about one photo (checks that vision works)")
+    se.add_argument("image")
+    se.add_argument("--prompt", default="Describe what you see, and read any text or numbers on plates or labels.")
     sub.add_parser("ping", help="check the Meta Model API key with one tiny request")
     args = ap.parse_args(argv)
 
     if args.command == "ping":
         return ping()
+    if args.command == "see":
+        return see(args.image, args.prompt)
     if args.command == "agent":
         return agent(args.case_dir, args.out, args.max_turns)
 

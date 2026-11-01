@@ -136,3 +136,47 @@ def test_out_of_range_input_reaches_the_model_as_text_not_a_crash():
     assert r["sized"] is False and "out of range" in r["error"]
     ws.case["system"]["performance_ratio"]["value"] = 0.75
     assert loop.dispatch(ws, "size_system", {})["sized"] is True
+
+
+def image_workspace(tmp_path):
+    (tmp_path / "documents").mkdir()
+    (tmp_path / "objective.md").write_text("Size it.")
+    (tmp_path / "documents" / "plate.jpg").write_bytes(b"\xff\xd8not really a jpeg")
+    (tmp_path / "documents" / "notes.txt").write_text("Head: 25 m")
+    return load_workspace(tmp_path)
+
+
+def test_photo_is_shown_to_the_model_in_the_next_message(tmp_path):
+    ws, objective = image_workspace(tmp_path)
+    client = FakeClient([reply(call("read_image", name="plate.jpg")), reply(text="seen")])
+    loop.run(client, "fake", ws, objective)
+    last = client.seen[-1]
+    assert last["role"] == "user" and last["content"][1]["type"] == "image_url"
+    assert last["content"][1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert ws.pending_images == []
+
+
+def test_photo_values_need_a_real_photo_and_always_become_open_questions(tmp_path):
+    from solar_agent import case as case_mod
+    from solar_agent.calc import loads
+    from solar_agent.trace import open_questions
+
+    ws, _ = image_workspace(tmp_path)
+    assert not ws.set_value("pumping", "head_m", 25, "image", "visible on the pump plate", "notes.txt")["accepted"]
+    assert not ws.set_value("pumping", "head_m", 25, "image", "x", "plate.jpg")["accepted"]
+    assert ws.set_value("pumping", "head_m", 25, "image", "pump nameplate shows max head 25 m", "plate.jpg")["accepted"]
+
+    ws.case["pumping"]["volume_m3_day"] = {"value": 10, "kind": "measured", "ref": "plant log"}
+    ws.case["pumping"]["wire_to_water_eff"] = {"value": 0.5, "kind": "datasheet", "ref": "pump sheet"}
+    p = case_mod.parse({**ws.case, "system": {k: {"value": 0.5 if k in ("performance_ratio", "depth_of_discharge", "battery_efficiency") else 1,
+                                                  "kind": "measured", "ref": "x"} for k in case_mod.FIELDS["system"]}})["pumping"]
+    energy = loads.pumping_energy(p["volume_m3_day"], p["head_m"], p["wire_to_water_eff"])
+    [q] = open_questions(energy)
+    assert q.label == "Total dynamic head" and q.source.kind == "image" and "plate.jpg" in q.source.ref
+
+
+def test_oversized_photo_is_refused_with_a_clear_message(tmp_path, monkeypatch):
+    ws, _ = image_workspace(tmp_path)
+    from solar_agent import llm
+    monkeypatch.setattr(llm, "MAX_IMAGE_BYTES", 5)
+    assert "resize" in ws.read_image("plate.jpg")["error"]

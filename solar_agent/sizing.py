@@ -75,7 +75,9 @@ def report(design: Design) -> str:
     questions = design.open_questions()
     lines += ["## Open questions before signing", ""]
     if questions:
-        lines += [f"- **{q.label}** = {fmt(q)} is assumed: {q.source.ref}" for q in questions]
+        lines += [f"- **{q.label}** = {fmt(q)} "
+                  + ("is assumed: " if q.source.kind == "assumption" else "was read from a photo; confirm on site: ")
+                  + q.source.ref for q in questions]
     else:
         lines.append("- None: every input is measured, from a datasheet, a standard or a dataset.")
     return "\n".join(lines) + "\n"

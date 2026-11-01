@@ -94,3 +94,9 @@ python -m solar_agent agent cases/example-agent             # run the agent; wri
 ```
 
 The agent only records inputs. A value cited from a document must quote it exactly, and the value must appear in the quote, or it is rejected. What a document cannot prove goes to a person. The proposal is written by code, never by the model. Muse Spark reasons before answering, so each call is given a generous token limit.
+
+```bash
+python -m solar_agent see photo.jpg      # check that Muse Spark reads a photo
+```
+
+Values read from a photo cannot be verified by code. They are recorded with kind `image`, cite the photo, and always appear under "Open questions" for a person to confirm on site.

@@ -34,6 +34,20 @@ def client():
     return OpenAI(api_key=key, base_url=os.environ.get("MODEL_API_BASE_URL", DEFAULT_BASE_URL))
 
 
+MAX_IMAGE_BYTES = 5_000_000
+IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def image_part(path: str | Path) -> dict:
+    """An OpenAI-style image content part with the file inlined as a data URL."""
+    import base64
+    import mimetypes
+
+    p = Path(path)
+    mime = mimetypes.guess_type(p.name)[0] or "image/jpeg"
+    return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(p.read_bytes()).decode()}"}}
+
+
 def model() -> str:
     load_env()
     return os.environ.get("MODEL_API_MODEL", DEFAULT_MODEL)

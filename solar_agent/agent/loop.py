@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from solar_agent import llm
 from solar_agent.agent.workspace import Workspace
 
 SYSTEM_PROMPT = """You prepare the technical basis of a solar + storage proposal from the documents of a case.
@@ -17,11 +18,15 @@ Rules that cannot be bent:
    parameters and routine engineering defaults (performance ratio, battery autonomy in days) may be recorded as
    kind assumption with a stated reason; a person confirms them later. If sizing needs a value you also asked a
    person about, record a reasoned assumption too, so sizing is not blocked; the question stays open.
-4. Efficiencies, depth of discharge and performance ratio are fractions between 0 and 1: 45 % is 0.45.
-5. Call get_solar_resource once for the site's design peak sun hours. Never set that value yourself.
-6. As soon as no required input is missing, call size_system. Do not call get_status repeatedly. If size_system
+4. Photos: call read_image to look at one. Whatever you read from a photo (a nameplate, a count, a length) is
+   recorded with kind image, the photo as `document`, and a description of exactly what is visible. Code cannot
+   verify a photo, so a person will confirm every such value on site. Never use kind image for text that a
+   document already gives you.
+5. Efficiencies, depth of discharge and performance ratio are fractions between 0 and 1: 45 % is 0.45.
+6. Call get_solar_resource once for the site's design peak sun hours. Never set that value yourself.
+7. As soon as no required input is missing, call size_system. Do not call get_status repeatedly. If size_system
    reports missing inputs, record them and call it again.
-7. Finish with one short sentence. The proposal document is written by code from what you recorded.
+8. Finish with one short sentence. The proposal document is written by code from what you recorded.
 """
 
 
@@ -33,11 +38,13 @@ def _tool(name: str, description: str, properties: dict, required: list[str]) ->
 TOOLS = [
     _tool("get_status", "Documents available, values already recorded, and what is still missing.", {}, []),
     _tool("read_document", "Read one case document in full.", {"name": {"type": "string"}}, ["name"]),
+    _tool("read_image", "Look at one photo of the case. It is attached in the next message.",
+          {"name": {"type": "string"}}, ["name"]),
     _tool("set_value",
           "Record one input. measured/datasheet/standard need `document` and an exact `why_or_quote` from it; "
-          "assumption needs a reason in `why_or_quote`. Fractions use 0-1 (45 % is 0.45).",
+          "assumption needs a reason in `why_or_quote`; image needs the photo as `document` and what is visible. Fractions use 0-1 (45 % is 0.45).",
           {"section": {"type": "string"}, "field": {"type": "string"}, "value": {"type": "number"},
-           "kind": {"type": "string", "enum": ["measured", "datasheet", "standard", "assumption"]},
+           "kind": {"type": "string", "enum": ["measured", "datasheet", "standard", "assumption", "image"]},
            "why_or_quote": {"type": "string"}, "document": {"type": "string"}},
           ["section", "field", "value", "kind", "why_or_quote"]),
     _tool("ask_human", "Escalate something that cannot be proven from the documents.",
@@ -48,7 +55,7 @@ TOOLS = [
 
 
 def dispatch(ws: Workspace, name: str, args: dict) -> dict:
-    fn = {"get_status": ws.get_status, "read_document": ws.read_document, "set_value": ws.set_value,
+    fn = {"get_status": ws.get_status, "read_document": ws.read_document, "read_image": ws.read_image, "set_value": ws.set_value,
           "ask_human": ws.ask_human, "get_solar_resource": ws.get_solar_resource, "size_system": ws.size_system}.get(name)
     if fn is None:
         return {"error": f"unknown tool {name!r}"}
@@ -89,6 +96,11 @@ def run(client, model: str, ws: Workspace, objective: str, max_turns: int = 25, 
                 result = dispatch(ws, c.function.name, args)
             log(f"turn {turn}: {c.function.name}({_short(c.function.arguments)}) -> {_short(json.dumps(result))}")
             messages.append({"role": "tool", "tool_call_id": c.id, "content": json.dumps(result, ensure_ascii=False)})
+        if ws.pending_images:
+            names = ", ".join(n for n, _ in ws.pending_images)
+            messages.append({"role": "user", "content": [{"type": "text", "text": f"Image(s) you asked to see: {names}"}]
+                             + [llm.image_part(p) for _, p in ws.pending_images]})
+            ws.pending_images.clear()
     return {"finished": False, "turns": max_turns, "final_text": ""}
 
 

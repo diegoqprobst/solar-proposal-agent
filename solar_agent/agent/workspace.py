@@ -19,11 +19,12 @@ from pathlib import Path
 from typing import Callable
 
 from solar_agent import case as case_mod
+from solar_agent import llm
 from solar_agent import sizing, solar_resource
 from solar_agent.trace import Value
 
 CITED_KINDS = ("measured", "datasheet", "standard")
-MODEL_KINDS = CITED_KINDS + ("assumption",)
+MODEL_KINDS = CITED_KINDS + ("assumption", "image")
 # Fractions between 0 and 1: 45 % is 0.45. The model once recorded 45, which would have broken the sizing.
 FRACTION_FIELDS = {("pumping", "wire_to_water_eff"), ("system", "performance_ratio"),
                    ("system", "depth_of_discharge"), ("system", "battery_efficiency")}
@@ -51,6 +52,8 @@ class Workspace:
     questions: list[dict] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)
     design: sizing.Design | None = None
+    images: dict[str, Path] = field(default_factory=dict)
+    pending_images: list[tuple[str, Path]] = field(default_factory=list)
     _last_status: str = ""
 
     # ---- tools exposed to the model; each returns a JSON-serialisable dict ----
@@ -65,7 +68,7 @@ class Workspace:
                     (optional if section in case_mod.OPTIONAL_SECTIONS else missing).append(item)
                 else:
                     have.setdefault(section, {})[key] = {"value": raw["value"], "kind": raw["kind"]}
-        status = {"documents": sorted(self.documents), "site": self.case.get("site", {}),
+        status = {"documents": sorted(self.documents), "images": sorted(self.images), "site": self.case.get("site", {}),
                   "have": have, "missing_required": missing, "missing_optional_only_for_co2": optional,
                   "open_questions_for_human": self.questions}
         signature = json.dumps([have, len(self.questions), len(self.events)], sort_keys=True)
@@ -80,6 +83,15 @@ class Workspace:
             return {"error": f"no such document: {name!r}", "documents": sorted(self.documents)}
         return {"name": name, "text": self.documents[name]}
 
+    def read_image(self, name: str) -> dict:
+        """Queue a photo so the loop shows it to the model in the next message."""
+        if name not in self.images:
+            return {"error": f"no such image: {name!r}", "images": sorted(self.images)}
+        if self.images[name].stat().st_size > llm.MAX_IMAGE_BYTES:
+            return {"error": f"{name} is larger than {llm.MAX_IMAGE_BYTES // 1_000_000} MB; a person must resize it"}
+        self.pending_images.append((name, self.images[name]))
+        return {"name": name, "note": "the image is attached in the next message"}
+
     def set_value(self, section: str, field: str, value: float, kind: str, why_or_quote: str,
                   document: str = "") -> dict:
         label_info = case_mod.FIELDS.get(section, {}).get(field)
@@ -93,7 +105,13 @@ class Workspace:
             return self._reject(section, field, "value must be a number")
         if (section, field) in FRACTION_FIELDS and not 0 < value <= 1:
             return self._reject(section, field, f"{field} is a fraction between 0 and 1 (45 % is 0.45); got {value}")
-        if kind == "assumption":
+        if kind == "image":
+            if document not in self.images:
+                return self._reject(section, field, f"cite an image of the case; have: {sorted(self.images)}")
+            if len(why_or_quote.strip()) < 10:
+                return self._reject(section, field, "describe what is visible in the photo that gives this value")
+            ref = f"photo {document}: {why_or_quote.strip()}"
+        elif kind == "assumption":
             if len(why_or_quote.strip()) < 10:
                 return self._reject(section, field, "an assumption needs a reason of at least a sentence")
             ref = why_or_quote.strip()
@@ -173,6 +191,7 @@ def load_workspace(case_dir: str | Path, **kwargs) -> tuple[Workspace, str]:
     root = Path(case_dir)
     objective = (root / "objective.md").read_text(encoding="utf-8")
     case = json.loads((root / "site.json").read_text(encoding="utf-8")) if (root / "site.json").is_file() else {}
-    docs = {p.name: p.read_text(encoding="utf-8") for p in sorted((root / "documents").glob("*"))
-            if p.suffix in (".txt", ".md")}
-    return Workspace(case=case, documents=docs, **kwargs), objective
+    files = sorted((root / "documents").glob("*"))
+    docs = {p.name: p.read_text(encoding="utf-8") for p in files if p.suffix in (".txt", ".md")}
+    images = {p.name: p for p in files if p.suffix.lower() in llm.IMAGE_SUFFIXES}
+    return Workspace(case=case, documents=docs, images=images, **kwargs), objective

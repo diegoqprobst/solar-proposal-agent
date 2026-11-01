@@ -4,8 +4,8 @@ import json
 from types import SimpleNamespace as NS
 
 
-def call(name, **args):
-    return NS(id=f"c{abs(hash((name, json.dumps(args, sort_keys=True)))) % 10**8}", function=NS(name=name, arguments=json.dumps(args)))
+def call(_fn, **args):
+    return NS(id=f"c{abs(hash((_fn, json.dumps(args, sort_keys=True)))) % 10**8}", function=NS(name=_fn, arguments=json.dumps(args)))
 
 
 def reply(*calls, text="", finish="tool_calls"):
