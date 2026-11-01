@@ -53,6 +53,7 @@ class Workspace:
     events: list[dict] = field(default_factory=list)
     design: sizing.Design | None = None
     images: dict[str, Path] = field(default_factory=dict)
+    unreadable: list[str] = field(default_factory=list)
     pending_images: list[tuple[str, Path]] = field(default_factory=list)
     _last_status: str = ""
 
@@ -71,6 +72,9 @@ class Workspace:
         status = {"documents": sorted(self.documents), "images": sorted(self.images), "site": self.case.get("site", {}),
                   "have": have, "missing_required": missing, "missing_optional_only_for_co2": optional,
                   "open_questions_for_human": self.questions}
+        if self.unreadable:
+            status["unreadable_documents"] = {"files": self.unreadable, "note": "scanned PDFs with no text layer; "
+                                              "a person must provide the values or a photo of the page"}
         signature = json.dumps([have, len(self.questions), len(self.events)], sort_keys=True)
         if signature == self._last_status:
             status["note"] = ("Nothing changed since your last get_status. Do not call it again: record the missing "
@@ -187,11 +191,33 @@ class Workspace:
         return {"accepted": False, "reason": reason}
 
 
+MIN_PDF_TEXT = 40
+
+
+def pdf_text(path: Path) -> str:
+    """Text of a PDF with page markers. Empty for scanned PDFs: nothing to quote, so nothing is guessed."""
+    from pypdf import PdfReader
+
+    pages = [(page.extract_text() or "").strip() for page in PdfReader(str(path)).pages]
+    text = "\n".join(f"[page {i}]\n{t}" for i, t in enumerate(pages, 1) if t)
+    return text if len(text.replace("\n", "")) >= MIN_PDF_TEXT else ""
+
+
 def load_workspace(case_dir: str | Path, **kwargs) -> tuple[Workspace, str]:
     root = Path(case_dir)
     objective = (root / "objective.md").read_text(encoding="utf-8")
     case = json.loads((root / "site.json").read_text(encoding="utf-8")) if (root / "site.json").is_file() else {}
     files = sorted((root / "documents").glob("*"))
     docs = {p.name: p.read_text(encoding="utf-8") for p in files if p.suffix in (".txt", ".md")}
+    unreadable = []
+    for p in files:
+        if p.suffix.lower() == ".pdf":
+            text = pdf_text(p)
+            if text:
+                docs[p.name] = text
+            else:
+                unreadable.append(p.name)
     images = {p.name: p for p in files if p.suffix.lower() in llm.IMAGE_SUFFIXES}
-    return Workspace(case=case, documents=docs, images=images, **kwargs), objective
+    ws = Workspace(case=case, documents=docs, images=images, **kwargs)
+    ws.unreadable = unreadable
+    return ws, objective

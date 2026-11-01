@@ -180,3 +180,25 @@ def test_oversized_photo_is_refused_with_a_clear_message(tmp_path, monkeypatch):
     from solar_agent import llm
     monkeypatch.setattr(llm, "MAX_IMAGE_BYTES", 5)
     assert "resize" in ws.read_image("plate.jpg")["error"]
+
+
+def test_pdf_datasheets_are_readable_and_quotable(tmp_path):
+    from tests.pdf_make import make_pdf
+    (tmp_path / "documents").mkdir()
+    (tmp_path / "objective.md").write_text("Size it.")
+    (tmp_path / "documents" / "luminaire.pdf").write_bytes(make_pdf(
+        ["LED street luminaire SL-40 datasheet", "Rated power: 40 W", "Luminous flux 5200 lm, IP66"]))
+    ws, _ = load_workspace(tmp_path)
+    assert "Rated power: 40 W" in ws.documents["luminaire.pdf"]
+    assert ws.set_value("lighting", "power_w", 40, "datasheet", "Rated power: 40 W", "luminaire.pdf")["accepted"]
+    assert not ws.set_value("lighting", "power_w", 60, "datasheet", "Rated power: 60 W", "luminaire.pdf")["accepted"]
+
+
+def test_scanned_pdf_is_reported_as_unreadable_not_guessed(tmp_path):
+    from tests.pdf_make import make_pdf
+    (tmp_path / "documents").mkdir()
+    (tmp_path / "objective.md").write_text("Size it.")
+    (tmp_path / "documents" / "scan.pdf").write_bytes(make_pdf([]))
+    ws, _ = load_workspace(tmp_path)
+    assert "scan.pdf" not in ws.documents
+    assert ws.get_status()["unreadable_documents"]["files"] == ["scan.pdf"]

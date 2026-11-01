@@ -100,3 +100,7 @@ python -m solar_agent see photo.jpg      # check that Muse Spark reads a photo
 ```
 
 Values read from a photo cannot be verified by code. They are recorded with kind `image`, cite the photo, and always appear under "Open questions" for a person to confirm on site.
+
+Datasheets may be PDFs with a text layer (quoted and checked like any text). Scanned PDFs have no text to quote: the agent reports them as unreadable and asks a person instead of guessing.
+
+Your own case goes in `private/<name>/` (git-ignored): `objective.md`, `site.json` with `{"name": "...", "site": {"latitude": 0, "longitude": 0}}`, and `documents/` with `.txt`, `.md`, `.pdf` and photos. Run `python -m solar_agent agent private/<name>`.
