@@ -49,9 +49,13 @@ def agent(case_dir: str, out: str, max_turns: int) -> int:
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "proposal.md").write_text(ws.proposal(), encoding="utf-8")
     (dest / "trace.json").write_text(ws.trace_json(), encoding="utf-8")
-    print(f"\n{'finished' if result['finished'] else 'STOPPED before finishing'} in {result['turns']} turns; "
-          f"wrote {dest}/proposal.md and trace.json")
-    return 0 if result["finished"] else 1
+    sized = ws.design is not None
+    if result["final_text"]:
+        print(f"\nagent: {result['final_text']}")
+    status = "finished and sized" if result["finished"] and sized else (
+        "finished but did NOT size the system" if result["finished"] else "STOPPED before finishing")
+    print(f"\n{status} in {result['turns']} turns; wrote {dest}/proposal.md and trace.json")
+    return 0 if result["finished"] and sized else 1
 
 
 def main(argv: list[str] | None = None) -> int:

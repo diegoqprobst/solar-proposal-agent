@@ -43,6 +43,7 @@ FIELDS: dict[str, dict[str, tuple[str, str]]] = {
     },
 }
 REQUIRED_SECTIONS = ("system",)
+OPTIONAL_SECTIONS = ("diesel",)  # only feeds the CO2 figure; incomplete means no CO2 line, not a failure
 
 
 class MissingData(ValueError):
@@ -69,11 +70,16 @@ def parse(case: dict) -> dict[str, dict[str, Value]]:
                 missing += [label for _, label in fields.values()]
             continue
         parsed[section] = {}
+        section_missing: list[str] = []
         for key, (unit, label) in fields.items():
             if key in raw_section:
                 parsed[section][key] = _value(raw_section[key], unit, label)
             else:
-                missing.append(label)
+                section_missing.append(label)
+        if section in OPTIONAL_SECTIONS and section_missing:
+            del parsed[section]
+            continue
+        missing += section_missing
     if "pumping" not in parsed and "lighting" not in parsed:
         missing.append("at least one load (pumping or lighting)")
     if missing:

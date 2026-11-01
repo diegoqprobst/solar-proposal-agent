@@ -101,3 +101,38 @@ def test_bad_tool_arguments_do_not_crash_the_loop():
     bad = reply(call("read_document"), call("nope"))  # missing argument, unknown tool
     result = loop.run(FakeClient([bad, reply(text="ok")]), "fake", ws, objective)
     assert result["finished"] is True
+
+
+def test_percentages_must_be_fractions_not_45():
+    ws, _ = workspace()
+    r = ws.set_value("pumping", "wire_to_water_eff", 45, "datasheet", "wire-to-water efficiency at the duty point 45 %", SHEETS)
+    assert r["accepted"] is False and "0.45" in r["reason"]
+    assert ws.set_value("pumping", "wire_to_water_eff", 0.45, "datasheet", "wire-to-water efficiency at the duty point 45 %", SHEETS)["accepted"]
+
+
+def test_incomplete_diesel_section_only_drops_co2_it_does_not_block_sizing():
+    ws, objective = workspace()
+    script = [reply(call("get_solar_resource")), reply(*GOOD_TURN), reply(call("size_system")), reply(text="Done.")]
+    script[1].choices[0].message.tool_calls.append(sv("diesel", "genset_kwh_per_litre", 3, "assumption", "routine small generator default", ""))
+    loop.run(FakeClient(script), "fake", ws, objective)
+    assert ws.design is not None and ws.design.co2_avoided is None
+
+
+def test_repeated_get_status_is_told_nothing_changed():
+    ws, _ = workspace()
+    assert "note" not in ws.get_status()
+    assert "Do not call it again" in ws.get_status()["note"]
+    ws.ask_human("Who owns the land?", "unknown")
+    assert "note" not in ws.get_status()
+
+
+def test_out_of_range_input_reaches_the_model_as_text_not_a_crash():
+    from solar_agent import case as case_mod
+    ws, _ = workspace()
+    ws.case.update({k: v for k, v in case_mod.load(CASE.parent / "example-pumping-route" / "case.json").items()
+                    if k in ("pumping", "lighting", "system", "solar")})
+    ws.case["system"]["performance_ratio"] = {"value": 75, "kind": "assumption", "ref": "typed as a percent"}
+    r = loop.dispatch(ws, "size_system", {})
+    assert r["sized"] is False and "out of range" in r["error"]
+    ws.case["system"]["performance_ratio"]["value"] = 0.75
+    assert loop.dispatch(ws, "size_system", {})["sized"] is True

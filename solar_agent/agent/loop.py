@@ -12,12 +12,16 @@ Rules that cannot be bent:
 1. You never do arithmetic and never invent a number. Code sizes the system; you only supply inputs.
 2. Every input comes from a document: call read_document, then set_value with kind measured, datasheet or
    standard, naming the document and quoting it exactly, copy-paste. The value must appear in the quote.
-3. If a document does not give a value, do NOT guess to look complete. Either call ask_human, or, only for
-   routine engineering defaults, set it as kind assumption with a stated reason. Anything about people, land,
-   permits, politics or access cannot be an assumption: ask a person.
-4. Call get_solar_resource once for the site's design peak sun hours. Never set that value yourself.
-5. When get_status shows nothing missing, call size_system. If it reports missing inputs, fix them and retry.
-6. Finish with one short sentence. The proposal document is written by code from what you recorded.
+3. If a document does not give a value, never guess to look complete. Facts about the world (who owns land,
+   permits, people, access, local rules, how much is consumed) cannot be assumptions: call ask_human. Design
+   parameters and routine engineering defaults (performance ratio, battery autonomy in days) may be recorded as
+   kind assumption with a stated reason; a person confirms them later. If sizing needs a value you also asked a
+   person about, record a reasoned assumption too, so sizing is not blocked; the question stays open.
+4. Efficiencies, depth of discharge and performance ratio are fractions between 0 and 1: 45 % is 0.45.
+5. Call get_solar_resource once for the site's design peak sun hours. Never set that value yourself.
+6. As soon as no required input is missing, call size_system. Do not call get_status repeatedly. If size_system
+   reports missing inputs, record them and call it again.
+7. Finish with one short sentence. The proposal document is written by code from what you recorded.
 """
 
 
@@ -31,7 +35,7 @@ TOOLS = [
     _tool("read_document", "Read one case document in full.", {"name": {"type": "string"}}, ["name"]),
     _tool("set_value",
           "Record one input. measured/datasheet/standard need `document` and an exact `why_or_quote` from it; "
-          "assumption needs a reason in `why_or_quote`.",
+          "assumption needs a reason in `why_or_quote`. Fractions use 0-1 (45 % is 0.45).",
           {"section": {"type": "string"}, "field": {"type": "string"}, "value": {"type": "number"},
            "kind": {"type": "string", "enum": ["measured", "datasheet", "standard", "assumption"]},
            "why_or_quote": {"type": "string"}, "document": {"type": "string"}},
@@ -52,6 +56,8 @@ def dispatch(ws: Workspace, name: str, args: dict) -> dict:
         return fn(**args)
     except TypeError as e:
         return {"error": f"bad arguments for {name}: {e}"}
+    except Exception as e:  # a tool failing must reach the model as text, never crash the run
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 def run(client, model: str, ws: Workspace, objective: str, max_turns: int = 25, max_tokens: int = 4000,

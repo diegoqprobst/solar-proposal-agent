@@ -24,6 +24,9 @@ from solar_agent.trace import Value
 
 CITED_KINDS = ("measured", "datasheet", "standard")
 MODEL_KINDS = CITED_KINDS + ("assumption",)
+# Fractions between 0 and 1: 45 % is 0.45. The model once recorded 45, which would have broken the sizing.
+FRACTION_FIELDS = {("pumping", "wire_to_water_eff"), ("system", "performance_ratio"),
+                   ("system", "depth_of_discharge"), ("system", "battery_efficiency")}
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
@@ -48,20 +51,29 @@ class Workspace:
     questions: list[dict] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)
     design: sizing.Design | None = None
+    _last_status: str = ""
 
     # ---- tools exposed to the model; each returns a JSON-serialisable dict ----
 
     def get_status(self) -> dict:
-        have, missing = {}, []
+        have, missing, optional = {}, [], []
         for section, fields in case_mod.FIELDS.items():
             for key, (_, label) in fields.items():
                 raw = self.case.get(section, {}).get(key)
                 if raw is None:
-                    missing.append({"section": section, "field": key, "label": label})
+                    item = {"section": section, "field": key, "label": label}
+                    (optional if section in case_mod.OPTIONAL_SECTIONS else missing).append(item)
                 else:
                     have.setdefault(section, {})[key] = {"value": raw["value"], "kind": raw["kind"]}
-        return {"documents": sorted(self.documents), "site": self.case.get("site", {}),
-                "have": have, "missing": missing, "open_questions_for_human": self.questions}
+        status = {"documents": sorted(self.documents), "site": self.case.get("site", {}),
+                  "have": have, "missing_required": missing, "missing_optional_only_for_co2": optional,
+                  "open_questions_for_human": self.questions}
+        signature = json.dumps([have, len(self.questions), len(self.events)], sort_keys=True)
+        if signature == self._last_status:
+            status["note"] = ("Nothing changed since your last get_status. Do not call it again: record the missing "
+                              "inputs (as assumptions with a reason if no document gives them), or call size_system.")
+        self._last_status = signature
+        return status
 
     def read_document(self, name: str) -> dict:
         if name not in self.documents:
@@ -79,6 +91,8 @@ class Workspace:
             value = float(value)
         except (TypeError, ValueError):
             return self._reject(section, field, "value must be a number")
+        if (section, field) in FRACTION_FIELDS and not 0 < value <= 1:
+            return self._reject(section, field, f"{field} is a fraction between 0 and 1 (45 % is 0.45); got {value}")
         if kind == "assumption":
             if len(why_or_quote.strip()) < 10:
                 return self._reject(section, field, "an assumption needs a reason of at least a sentence")
@@ -121,6 +135,8 @@ class Workspace:
             self.design = sizing.size(self.case)
         except case_mod.MissingData as e:
             return {"sized": False, "missing": e.missing}
+        except ValueError as e:
+            return {"sized": False, "error": f"an input is out of range: {e}"}
         results = {v.label: {"value": round(v.value, 3), "unit": v.unit} for v in self.design.results()}
         questions = [{"label": q.label, "value": q.value, "why": q.source.ref} for q in self.design.open_questions()]
         self.events.append({"event": "sized", "results": results})
