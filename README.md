@@ -1,106 +1,104 @@
 # Solar Proposal Agent
 
-**Site photos, a map and product datasheets in; a sized, budgeted and verifiable solar + storage proposal out.**
+**An agent that never invents a number.** It turns a site's documents (datasheets, surveys, photos) into a sized solar + storage design where every figure traces back to its source, and anything it cannot prove is handed to a person.
 
-Built for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details) (Oct 27 – Nov 4, 2026), track *Build for Your World*.
+Built for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details) (Oct 27 – Nov 4, 2026), track *Build for Your World*. Model: **Muse Spark 1.3** through the Meta Model API.
 
 ## The problem
 
-In 2024 Ecuador went through rationing of up to 14 hours a day. Businesses, schools, health posts and rural water systems went dark. Solar plus storage is the obvious answer. What blocks it is the proposal: the site survey, the sizing, the bill of materials and a budget that holds up. An installer builds every quote by hand. A community applying to a fund rarely has an engineer to do it.
+In 2024 Ecuador rationed power for up to 14 hours a day. Rural water plants stopped pumping and footbridges used for evacuation went dark. Solar plus storage is the obvious answer; what blocks it is the proposal. Someone has to survey the site, size the system, choose products and write a budget that survives review. Installers do it by hand for every quote, and communities applying to a fund rarely have an engineer.
 
-The author ran into this firsthand. In 2024 he wrote a proposal to protect a rural water system and an evacuation route with solar in Santo Domingo de los Tsáchilas, Ecuador. It was never funded. That proposal is background research only. **No code existed before this hackathon.**
+The author lived this firsthand. In 2024 he wrote a proposal to protect a rural water plant and its evacuation route with solar power in Santo Domingo de los Tsáchilas, Ecuador. It was never funded: it was set aside before anyone reviewed it. Reading his own proposal again, the weak spot was the technical basis. The system was never sized and the budget did not add up. This project is the tool that proposal needed.
+
+## What it does
+
+```
+case folder: objective.md · site.json · documents/ (.txt .md .pdf, photos)
+        │
+        ▼
+ Muse Spark agent ── reads documents ── records inputs through tools
+        │                               (each input cites its source)
+        ├─ get_solar_resource   NASA POWER, worst-month design value (code, not the model)
+        ├─ ask_human            what the documents cannot prove goes to a person
+        └─ size_system          deterministic sizing code
+        │
+        ▼
+ proposal.md  — written by code: results, the full derivation of every number,
+                and "open questions before signing"
+ trace.json   — every tool call, every rejected input
+```
 
 ## The principle: what you measure, you show
 
-The language model never does arithmetic and never invents a number.
+The model reads and records; it never does arithmetic and never decides what counts as proven.
 
-- **Every number is traceable.** It is either *given*, with a source (measured on site, read from a datasheet, taken from a standard or a dataset, or explicitly assumed), or *derived*, with its formula and inputs. Any figure in a proposal can be explained back to where it came from.
-- **Sizing is deterministic code.** Pumping energy, lighting, PV array, battery bank and CO2 avoided are all computed in code, with tests. The CO2 factor is derived from IPCC tables, not typed in.
-- **Budgets add up by construction.** Totals and percentages are computed from line items. A hand-written budget can be audited for totals that do not match their parts.
-- **Assumptions become open questions.** Anything nobody measured is listed for a person to confirm before signing.
-- **Missing data stops the process.** If a required measurement is missing, sizing stops and says what to measure.
+- **Quote-checked inputs.** A value taken from a document must quote that document exactly, and the value must appear inside the quote. An invented quote, or a number that is not in its own quote, is rejected in code.
+- **Units are enforced.** Efficiencies and similar fields must be fractions between 0 and 1 (45 % is 0.45). The live model once recorded `45`; the check now rejects it and the model corrects itself.
+- **Sizing is deterministic code**: pumping energy, lighting, PV array, battery bank, CO2 avoided (the emission factor is derived from IPCC tables, never typed in). Every result carries its formula and inputs.
+- **Assumptions become open questions.** Engineering defaults are allowed, but each is listed for a person to confirm before signing. Facts about the world (land, permits, access) cannot be assumed: the agent must ask.
+- **The proposal text is written by code**, not by the model, so it cannot contain a figure that was not computed.
+- **Missing data stops the process** instead of being papered over. A scanned PDF with no text layer is reported as unreadable.
+- **Photos cannot be verified by code**, so a value read from one is recorded with its own kind (`image`), cites the photo, and always appears under open questions for confirmation on site.
 
-The agent built on top of this core uses Meta's models:
+## Built with Meta
 
-- **Muse Spark** reads photos and datasheets and drives the workflow.
-- **SAM 3.1** segments equipment and surfaces in site photos.
-
-The agent only fills in *given* values, with their source, and calls the calculators. A verification step rechecks every number and every citation.
-
-## Status
-
-| Part | State |
+| Meta tool | How it is used |
 |---|---|
-| Traceable values, sizing calculators, budget, CO2 | Done, tested |
-| Case format (`case.json`), CLI, traced report | Done, tested |
-| Solar resource from NASA POWER (worst-month design) | Done. Tested on a synthetic payload; not yet run live. |
-| Meta Model API client | Written; not yet run against the live API |
-| Agent loop (Muse Spark + tools), photo and datasheet reading, SAM 3.1 | Next |
-| Verification layer, human sign-off, proposal document, UI | Next |
+| **Muse Spark 1.3** (Meta Model API, OpenAI-compatible) | Agent loop with tool calling. It reads the case, records inputs with citations, decides what to ask a person, and triggers the sizing. It is a reasoning model, so each call is given a large token budget. |
+| Image input | `read_image` shows a photo to the model. Implemented and unit-tested; see Status. |
 
-## Try it
+Not used: SAM 3.1, Muse Voice, open-weight models.
+
+## What was built during the hackathon, and what was not
+
+Everything in this repository was written between Oct 27 and Nov 4, 2026. No code existed before. The 2024 funding proposal is background research that motivated the project; it is not included here.
+
+## Evidence from live runs
+
+On the synthetic example case (`cases/example-agent`), Muse Spark read two documents, recorded eleven quote-checked inputs, fetched real irradiance for the site from NASA POWER (3.23 h/day in the worst month, June), and sized the system in 18 turns: 16,283 Wh/day of load and about 7.15 kWp of PV (13 modules of 550 Wp). That daily energy matches an independent hand calculation.
+
+The first live run exposed three defects, all fixed and covered by tests:
+
+1. The model recorded percentages as `45` instead of `0.45`, and my validation accepted it because "45 %" appears in the quote. Fields are now range-checked.
+2. After asking a person about a design parameter, the agent called `get_status` seven times in a row without progress. Repeated calls are now told nothing changed, and the instructions separate facts about the world (ask) from design defaults (assume and flag).
+3. The run was reported as finished although the system was never sized. A run is now a success only if it was sized.
+
+## Status and limits, honestly
+
+- The worked example is **synthetic**. It exercises the pipeline and describes no real site.
+- It sizes pumping and lighting loads with solar plus battery. It does not choose between products, price a budget from real quotes, or design the electrical layout. The budget module exists and is tested, but the agent does not use it yet.
+- Photo reading and PDF datasheets are implemented and unit-tested against a scripted model. Live results on real photos are not part of the evidence above.
+- Sizing uses NASA climatology for the worst month. It is a preliminary design for a qualified installer or engineer to review and sign.
+- 41 offline tests, none of which call a live API.
+
+## Run it
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest
-.venv/bin/python -m solar_agent size cases/example-pumping-route/case.json \
-    --nasa-power tests/fixtures/nasa_power_synthetic.json
+.venv/bin/python -m pytest                       # offline
+cp .env.example .env                             # add MODEL_API_KEY
+.venv/bin/python -m solar_agent ping             # check the key
+.venv/bin/python -m solar_agent agent cases/example-agent
 ```
 
-The example case and the NASA POWER fixture are **synthetic**. They exercise the pipeline and do not describe a real site.
-
-A value in `case.json` always states its origin:
-
-```json
-"head_m": {"value": 25, "kind": "measured", "ref": "site survey 2026-10-30, static lift + pipe losses"}
-```
-
-`kind` is one of `measured`, `datasheet`, `standard`, `dataset` or `assumption`.
+Your own case goes in `private/<name>/` (git-ignored) with `objective.md`, `site.json` and `documents/`.
 
 ## Layout
 
 ```
 solar_agent/
-  trace.py           traceable values: given / assumed / derived, explain, open questions
-  calc/loads.py      pumping and lighting energy
-  calc/pv.py         PV array, modules, battery bank
-  calc/emissions.py  diesel displaced and CO2 avoided (IPCC-derived factor)
-  calc/budget.py     budgets that add up; audit of hand-written totals
+  trace.py           values that know their source: given / assumed / derived
+  calc/              loads, PV and battery, emissions (IPCC-derived), budgets that add up
   solar_resource.py  NASA POWER client, worst-month design value
-  case.py            case.json parsing; missing data -> what to measure
+  case.py            case format; missing data names what to measure
   sizing.py          case -> design -> traced report
-  llm.py             Meta Model API client (OpenAI-compatible)
-cases/               example case (synthetic)
-tests/               offline tests; never call a live API
+  agent/workspace.py the agent's tools and the checks that keep it honest
+  agent/loop.py      the agent loop (plain OpenAI SDK)
+  llm.py             Meta Model API client, .env loading, image input
+cases/example-agent  synthetic case: survey, datasheets
+tests/               offline tests and a scripted fake model
 ```
-
-## Configuration
-
-Copy `.env.example` to `.env` and set `MODEL_API_KEY`. Never commit `.env`.
-
-## Disclaimer
-
-This tool produces a preliminary design for a qualified installer or engineer to review and sign. It does not replace a site survey, an electrical design or compliance with local regulation.
 
 ## License
 
-MIT
-
-## Agent
-
-```bash
-python -m solar_agent ping                                  # check the Meta API key
-python -m solar_agent agent cases/example-agent             # run the agent; writes runs/example-agent/
-```
-
-The agent only records inputs. A value cited from a document must quote it exactly, and the value must appear in the quote, or it is rejected. What a document cannot prove goes to a person. The proposal is written by code, never by the model. Muse Spark reasons before answering, so each call is given a generous token limit.
-
-```bash
-python -m solar_agent see photo.jpg      # check that Muse Spark reads a photo
-```
-
-Values read from a photo cannot be verified by code. They are recorded with kind `image`, cite the photo, and always appear under "Open questions" for a person to confirm on site.
-
-Datasheets may be PDFs with a text layer (quoted and checked like any text). Scanned PDFs have no text to quote: the agent reports them as unreadable and asks a person instead of guessing.
-
-Your own case goes in `private/<name>/` (git-ignored): `objective.md`, `site.json` with `{"name": "...", "site": {"latitude": 0, "longitude": 0}}`, and `documents/` with `.txt`, `.md`, `.pdf` and photos. Run `python -m solar_agent agent private/<name>`.
+MIT. Code is MIT; the example case is synthetic.
