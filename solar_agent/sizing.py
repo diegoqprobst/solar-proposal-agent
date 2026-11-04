@@ -9,6 +9,11 @@ from solar_agent.calc import emissions, loads, pv
 from solar_agent.trace import Value, explain, fmt, open_questions
 
 
+# Facts about the place itself. Unlike engineering defaults (performance ratio, battery voltage), nobody can
+# assume them for a real site, so a result that rests on a placeholder for one of these is only illustrative.
+SITE_FACT_LABELS = ("Water demand", "Total dynamic head", "Route length")
+
+
 @dataclass(frozen=True)
 class Design:
     name: str
@@ -67,7 +72,15 @@ def size(case: dict, design_psh: Value | None = None) -> Design:
 
 
 def report(design: Design) -> str:
-    lines = [f"# {design.name}", "", "## Results", ""]
+    lines = [f"# {design.name}", ""]
+    placeholders = [q for q in design.open_questions()
+                    if q.source.kind == "assumption" and q.label in SITE_FACT_LABELS]
+    if placeholders:
+        names = ", ".join(f"{q.label} ({fmt(q)})" for q in placeholders)
+        lines += [f"> **ILLUSTRATIVE ONLY.** These facts about the site were not provided and are placeholders: {names}. "
+                  "The results below show how the system would be sized once they are measured. "
+                  "Do not use them to buy equipment or to request funding.", ""]
+    lines += ["## Results", ""]
     lines += [f"- **{v.label}:** {fmt(v)}" for v in design.results()]
     lines += ["", "## How each number was obtained", ""]
     for v in design.results():

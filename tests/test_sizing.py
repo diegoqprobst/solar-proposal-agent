@@ -96,3 +96,16 @@ def test_load_env_reads_file_and_does_not_override(tmp_path, monkeypatch):
     assert os.environ["MODEL_API_KEY"] == "abc"
     assert "MODEL_API_MODEL" not in os.environ  # empty value ignored
     assert os.environ["OTHER"] == "keep"
+
+
+def test_report_is_stamped_illustrative_when_site_facts_are_placeholders():
+    text = sizing.report(sizing.size(example()))
+    assert text.splitlines()[2].startswith("> **ILLUSTRATIVE ONLY.**")
+    assert "Water demand (60 m3/day)" in text and "Total dynamic head (25 m)" in text
+
+
+def test_report_is_not_stamped_when_site_facts_are_measured():
+    c = example()
+    for section, field in (("pumping", "volume_m3_day"), ("pumping", "head_m"), ("lighting", "route_length_m")):
+        c[section][field]["kind"] = "measured"
+    assert "ILLUSTRATIVE" not in sizing.report(sizing.size(c))
