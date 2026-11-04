@@ -58,13 +58,13 @@ def see(image: str, prompt: str) -> int:
     return 0
 
 
-def agent(case_dir: str, out: str, max_turns: int) -> int:
+def agent(case_dir: str, out: str, max_turns: int, max_tokens: int = 16000) -> int:
     from solar_agent import llm
     from solar_agent.agent import loop
     from solar_agent.agent.workspace import load_workspace
 
     ws, objective = load_workspace(case_dir)
-    result = loop.run(llm.client(), llm.model(), ws, objective, max_turns=max_turns, log=print)
+    result = loop.run(llm.client(), llm.model(), ws, objective, max_turns=max_turns, max_tokens=max_tokens, log=print)
     dest = Path(out) / Path(case_dir).name
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "proposal.md").write_text(ws.proposal(), encoding="utf-8")
@@ -88,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     ag.add_argument("case_dir")
     ag.add_argument("--out", default="runs")
     ag.add_argument("--max-turns", type=int, default=25)
+    ag.add_argument("--max-tokens", type=int, default=16000, help="per-call budget; reasoning counts against it")
     se = sub.add_parser("see", help="ask the model about one photo (checks that vision works)")
     se.add_argument("image")
     se.add_argument("--prompt", default="Describe what you see, and read any text or numbers on plates or labels.")
@@ -99,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "see":
         return see(args.image, args.prompt)
     if args.command == "agent":
-        return agent(args.case_dir, args.out, args.max_turns)
+        return agent(args.case_dir, args.out, args.max_turns, args.max_tokens)
 
     case = case_mod.load(args.case)
     psh = None

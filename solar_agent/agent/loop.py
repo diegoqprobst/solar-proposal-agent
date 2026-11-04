@@ -67,13 +67,16 @@ def dispatch(ws: Workspace, name: str, args: dict) -> dict:
         return {"error": f"{type(e).__name__}: {e}"}
 
 
-def run(client, model: str, ws: Workspace, objective: str, max_turns: int = 25, max_tokens: int = 4000,
+def run(client, model: str, ws: Workspace, objective: str, max_turns: int = 25, max_tokens: int = 16000,
         log=lambda line: None) -> dict:
     """Returns {"finished": bool, "turns": int, "final_text": str}. `finished` is False if the turn limit was hit."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Case objective:\n\n{objective}\n\nBegin with get_status."}]
     for turn in range(1, max_turns + 1):
-        resp = client.chat.completions.create(model=model, messages=messages, tools=TOOLS, max_tokens=max_tokens)
+        resp = _create(client, model, messages, max_tokens, log)
+        if resp is None:
+            log(f"turn {turn}: still out of tokens after retries; the case is too large for one turn")
+            return {"finished": False, "turns": turn, "final_text": ""}
         choice = resp.choices[0]
         msg = choice.message
         calls = msg.tool_calls or []
@@ -102,6 +105,22 @@ def run(client, model: str, ws: Workspace, objective: str, max_turns: int = 25, 
                              + [llm.image_part(p) for _, p in ws.pending_images]})
             ws.pending_images.clear()
     return {"finished": False, "turns": max_turns, "final_text": ""}
+
+
+MAX_BUDGET = 64000
+
+
+def _create(client, model, messages, max_tokens, log):
+    """One model call. A reasoning model can spend its whole budget thinking and return nothing
+    (finish_reason 'length'); retry with double the budget instead of giving up. None if it never fits."""
+    budget = max_tokens
+    for _ in range(3):
+        resp = client.chat.completions.create(model=model, messages=messages, tools=TOOLS, max_tokens=budget)
+        if resp.choices[0].finish_reason != "length":
+            return resp
+        log(f"the model ran out of tokens at {budget}; retrying with {min(budget * 2, MAX_BUDGET)}")
+        budget = min(budget * 2, MAX_BUDGET)
+    return None
 
 
 def _short(text: str, n: int = 140) -> str:

@@ -92,7 +92,7 @@ def test_turn_limit_and_token_exhaustion_are_reported_not_hidden():
     ws, objective = workspace()
     endless = [reply(call("get_status")) for _ in range(3)]
     assert loop.run(FakeClient(endless), "fake", ws, objective, max_turns=3)["finished"] is False
-    truncated = [reply(finish="length")]
+    truncated = [reply(finish="length")] * 3
     assert loop.run(FakeClient(truncated), "fake", ws, objective)["finished"] is False
 
 
@@ -202,3 +202,18 @@ def test_scanned_pdf_is_reported_as_unreadable_not_guessed(tmp_path):
     ws, _ = load_workspace(tmp_path)
     assert "scan.pdf" not in ws.documents
     assert ws.get_status()["unreadable_documents"]["files"] == ["scan.pdf"]
+
+
+def test_a_call_cut_off_while_reasoning_is_retried_with_a_bigger_budget():
+    ws, objective = workspace()
+    budgets = []
+
+    class Recording(FakeClient):
+        def _create(self, **kw):
+            budgets.append(kw["max_tokens"])
+            return super()._create(**kw)
+
+    client = Recording([reply(finish="length"), reply(text="Done.")])
+    client.chat.completions.create = client._create
+    result = loop.run(client, "fake", ws, objective, max_tokens=1000)
+    assert result["finished"] is True and budgets == [1000, 2000]
