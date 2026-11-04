@@ -57,7 +57,9 @@ Everything in this repository was written between Oct 27 and Nov 4, 2026. No cod
 
 On the synthetic example case (`cases/example-agent`), Muse Spark read two documents, recorded eleven quote-checked inputs, fetched real irradiance for the site from NASA POWER (3.23 h/day in the worst month, June), and sized the system in 18 turns: 16,283 Wh/day of load and about 7.15 kWp of PV (13 modules of 550 Wp). That daily energy matches an independent hand calculation.
 
-A second live run used a real product datasheet (a solar street luminaire) and short notes taken from the 2024 proposal. The agent read both, then asked six questions it could not answer from the documents: water demand, pumping head, route length, pole spacing, luminaire power and hours of operation. It sized the system with flagged placeholders. (The "ILLUSTRATIVE ONLY" stamp on the report was added after this run, because the placeholders made the result look like a real design.) This run also exposed two limits, listed below.
+A second live run used a real product datasheet (a solar street luminaire) and short notes taken from the 2024 proposal. The agent read both, then asked six questions it could not answer from the documents: water demand, pumping head, route length, pole spacing, luminaire power and hours of operation. It sized the system with flagged placeholders. (The "ILLUSTRATIVE ONLY" stamp on the report was added after this run, because the placeholders made the result look like a real design.) A later run of the same case behaved differently: it declined to size anything, wrote "Proposal not produced" and returned eight questions, noting that the datasheet gives the luminous flux and the integrated panel's power but no LED wattage, and that this value must come from a document and "not [be] derived by arithmetic". It also asked for the pump and battery datasheets, which were not in the case folder. The model is not deterministic, so the same input can give either output; both are honest about what is missing.
+
+These runs also exposed two limits, listed below.
 
 The first live run exposed three defects, all fixed and covered by tests:
 

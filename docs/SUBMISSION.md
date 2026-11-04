@@ -32,7 +32,10 @@ Do not claim: SAM 3.1, voice, open-weight models, real-site results, product com
 - Meta tooling: Muse Spark 1.3 via the Meta Model API, tool calling, reasoning model.
 
 ## Real-datasheet segment (use it in place of the 1:50-2:20 row if time is tight)
-Show the second run: the six `ask_human` lines, then the top of `proposal.md` with the ILLUSTRATIVE ONLY box.
-Say: "With one real datasheet and notes from my 2024 proposal, the agent does not invent a design. It asks the six
-things that must be measured on site, and the report is stamped illustrative. Testing it also showed me a limit: this
-luminaire has its own panel and battery, and the agent did not notice. That is the next thing I fix."
+Show the real-datasheet run and the file `runs/valle-hermoso/proposal.md`: "Proposal not produced" followed by the list of questions.
+Say: "With one real datasheet and notes from my 2024 proposal, the agent refuses to invent a design for a real place.
+It returns exactly what must be measured on site, and it points out that the datasheet has no LED wattage and that
+it must not be derived by arithmetic. Testing it on a real product also showed me a limit: this luminaire has its own
+panel and battery, and the agent did not notice. That is the next thing I fix."
+Note the model is not deterministic: another run of the same case filled flagged placeholders and the report is
+stamped ILLUSTRATIVE ONLY. Do not promise a particular output in the video.
