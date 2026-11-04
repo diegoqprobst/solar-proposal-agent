@@ -57,6 +57,8 @@ Everything in this repository was written between Oct 27 and Nov 4, 2026. No cod
 
 On the synthetic example case (`cases/example-agent`), Muse Spark read two documents, recorded eleven quote-checked inputs, fetched real irradiance for the site from NASA POWER (3.23 h/day in the worst month, June), and sized the system in 18 turns: 16,283 Wh/day of load and about 7.15 kWp of PV (13 modules of 550 Wp). That daily energy matches an independent hand calculation.
 
+A second live run used a real product datasheet (a solar street luminaire) and short notes taken from the 2024 proposal. The agent read both, then asked six questions it could not answer from the documents: water demand, pumping head, route length, pole spacing, luminaire power and hours of operation. It sized the system with flagged placeholders. (The "ILLUSTRATIVE ONLY" stamp on the report was added after this run, because the placeholders made the result look like a real design.) This run also exposed two limits, listed below.
+
 The first live run exposed three defects, all fixed and covered by tests:
 
 1. The model recorded percentages as `45` instead of `0.45`, and my validation accepted it because "45 %" appears in the quote. Fields are now range-checked.
@@ -67,6 +69,9 @@ The first live run exposed three defects, all fixed and covered by tests:
 
 - The worked example is **synthetic**. It exercises the pipeline and describes no real site.
 - It sizes pumping and lighting loads with solar plus battery. It does not choose between products, price a budget from real quotes, or design the electrical layout. The budget module exists and is tested, but the agent does not use it yet.
+- **Autonomous luminaires are not recognised.** The real datasheet describes a luminaire with its own integrated panel and battery. The agent sized a central supply for it anyway. Such luminaires should be counted, not powered from the central system.
+- **The model sometimes does arithmetic.** The datasheet gives 15,000 lm at 230 lm/W and no wattage; the model divided to get 65 W and recorded it as an assumption. It is flagged for a person to confirm, but the division was not done by code.
+- Facts about the place (water demand, head, route length) are placeholders unless a document provides them, and the report says so in its header.
 - Photo reading and PDF datasheets are implemented and unit-tested against a scripted model. Live results on real photos are not part of the evidence above.
 - Sizing uses NASA climatology for the worst month. It is a preliminary design for a qualified installer or engineer to review and sign.
 - 41 offline tests, none of which call a live API.

@@ -30,3 +30,9 @@ Do not claim: SAM 3.1, voice, open-weight models, real-site results, product com
 - One line: An agent that sizes solar + storage for rural infrastructure with every number traced to a source, and hands what it cannot prove to a person.
 - New work: all code written Oct 27 – Nov 4. The 2024 proposal is background and is not in the repo.
 - Meta tooling: Muse Spark 1.3 via the Meta Model API, tool calling, reasoning model.
+
+## Real-datasheet segment (use it in place of the 1:50-2:20 row if time is tight)
+Show the second run: the six `ask_human` lines, then the top of `proposal.md` with the ILLUSTRATIVE ONLY box.
+Say: "With one real datasheet and notes from my 2024 proposal, the agent does not invent a design. It asks the six
+things that must be measured on site, and the report is stamped illustrative. Testing it also showed me a limit: this
+luminaire has its own panel and battery, and the agent did not notice. That is the next thing I fix."
